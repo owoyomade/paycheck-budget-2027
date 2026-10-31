@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "radial-halo",
+        "value": "*",
+        "files": [
+          "sell/listing/studio.html"
+        ],
+        "createdAt": "2026-10-31T07:04:47.129Z",
+        "reason": "Design call: a pale #dfe5ff tint on the light listing-photo canvas, giving the phone frames depth; not a saturated glow on a dark page"
+      }
+    ]
+  }
+}

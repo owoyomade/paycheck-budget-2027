@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Listing photo studio</title>
+<!-- Lays out one Etsy listing photo around the REAL app, loaded in phone and laptop frames.
+     Open as /sell/listing/studio.html?shot=1 (served from the project root, so /site/ is the live app).
+     sell/make_listing_photos.mjs opens each shot and saves it as a 2000 x 2000 PNG. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&display=swap">
+<style>
+  /* The canvas is 1000 x 1000 CSS px, saved at 2x for a crisp 2000 x 2000 image. */
+  :root {
+    --ink: #0d1017; --muted: #5d6474; --cobalt: #2546f0; --soft: #eef1fe; --bg: #f4f5f7; --line: #e2e5eb;
+    --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", sans-serif;
+    --body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { width: 1000px; height: 1000px; overflow: hidden; position: relative; background: var(--bg); color: var(--ink); font-family: var(--body); }
+  .glow { position: absolute; width: 760px; height: 760px; border-radius: 50%; background: radial-gradient(circle, #dfe5ff 0%, rgb(223 229 255 / 0) 68%); pointer-events: none; }
+
+  .head { position: absolute; left: 70px; right: 70px; top: 64px; }
+  .eyebrow { font-family: var(--display); font-weight: 700; font-size: 17px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--cobalt); margin-bottom: 14px; }
+  h1 { font-family: var(--display); font-weight: 800; font-size: 56px; line-height: 1.02; letter-spacing: -0.03em; margin: 0; text-wrap: balance; }
+  h1 em { font-style: normal; color: var(--cobalt); }
+  .sub { font-size: 22px; color: var(--muted); margin-top: 14px; line-height: 1.35; max-width: 820px; }
+
+  /* Phone: a status bar, then the real app at 390 x 844, scaled to fit. */
+  .device { position: absolute; padding: 10px; background: #0d1017; border-radius: 50px; box-shadow: 0 40px 80px rgb(16 24 40 / 0.22), 0 8px 20px rgb(16 24 40 / 0.12); }
+  .screen { position: relative; overflow: hidden; border-radius: 40px; background: var(--sb, #f4f5f7); }
+  .statusbar { height: 44px; display: flex; align-items: center; justify-content: space-between; padding: 6px 30px 0; font: 600 16px var(--body); color: #0d1017; background: var(--sb, #f4f5f7); }
+  .statusbar .icons { display: flex; gap: 6px; align-items: center; }
+  .statusbar .bars { display: flex; gap: 2px; align-items: flex-end; height: 11px; }
+  .statusbar .bars i { width: 3px; background: #0d1017; border-radius: 1px; }
+  .statusbar .battery { width: 25px; height: 12px; border: 1.5px solid #0d1017; border-radius: 4px; padding: 1.5px; position: relative; }
+  .statusbar .battery::after { content: ""; display: block; height: 100%; width: 80%; background: #0d1017; border-radius: 1.5px; }
+  .screen-inner { transform-origin: 0 0; width: 390px; }
+  .screen-inner .statusbar { width: 390px; }
+  .screen iframe { display: block; width: 390px; height: 844px; border: 0; background: #fff; }
+
+  /* Laptop */
+  .laptop { position: absolute; }
+  .laptop .lid { background: #0d1017; border-radius: 22px 22px 0 0; padding: 16px 16px 20px; box-shadow: 0 40px 80px rgb(16 24 40 / 0.2); }
+  .laptop .lid .screen { border-radius: 6px; }
+  .laptop .base { height: 22px; margin: 0 -46px; background: linear-gradient(#d9dce3, #b9bdc7); border-radius: 0 0 22px 22px; position: relative; }
+  .laptop .base::before { content: ""; position: absolute; left: 50%; top: 0; width: 130px; height: 8px; transform: translateX(-50%); background: #a9aeb9; border-radius: 0 0 10px 10px; }
+
+  /* Callouts and step cards */
+  .callout { position: absolute; background: #fff; border-radius: 24px; padding: 22px 26px; box-shadow: 0 20px 50px rgb(16 24 40 / 0.14); }
+  .callout .label { font-size: 17px; color: var(--muted); }
+  .callout .big { font-family: var(--display); font-weight: 800; font-size: 46px; letter-spacing: -0.02em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .callout .row { display: flex; align-items: center; gap: 14px; }
+  .callout .arrow { font-family: var(--display); font-size: 36px; color: var(--cobalt); }
+  .callout .from { color: #b42318; }
+  .callout .to { color: var(--cobalt); }
+  .pills { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 22px; }
+  .pill { background: #fff; border-radius: 999px; padding: 10px 18px; font-size: 19px; font-weight: 600; box-shadow: 0 6px 16px rgb(16 24 40 / 0.08); }
+  .pill b { color: var(--cobalt); }
+  .points { position: absolute; display: grid; gap: 18px; }
+  .point { display: grid; grid-template-columns: 58px 1fr; gap: 16px; align-items: center; background: #fff; border-radius: 22px; padding: 18px 22px; box-shadow: 0 10px 30px rgb(16 24 40 / 0.08); }
+  .point .ic { width: 58px; height: 58px; border-radius: 16px; background: var(--soft); display: grid; place-items: center; color: var(--cobalt); font-family: var(--display); font-weight: 800; font-size: 26px; }
+  .point .ic svg { width: 30px; height: 30px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .point b { display: block; font-family: var(--display); font-size: 25px; letter-spacing: -0.01em; }
+  .point span { font-size: 17px; color: var(--muted); }
+  .tag { position: absolute; font-family: var(--display); font-weight: 700; font-size: 18px; color: var(--muted); text-align: center; }
+  .brandline { position: absolute; left: 70px; bottom: 44px; display: flex; align-items: center; gap: 10px; font-family: var(--display); font-weight: 700; font-size: 19px; }
+  .brandline img { width: 34px; height: 34px; border-radius: 9px; }
+</style>
+</head>
+<body>
+<div id="canvas"></div>
+<script type="module">
+import { sampleState, blankState } from '/site/sample.js';
+
+const TODAY = '2027-01-15';
+const PALETTE_BG = { cobalt: '#f4f5f7', blush: '#f8f3f4', sage: '#f3f5f2', lavender: '#f5f4f9' };
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// ---------- Building blocks ----------
+function phone({ x, y, scale = 0.8, palette = 'cobalt' }) {
+  const el = document.createElement('div');
+  el.className = 'device';
+  el.style.left = `${x}px`;
+  el.style.top = `${y}px`;
+  el.innerHTML = `
+    <div class="screen" style="--sb:${PALETTE_BG[palette]};width:${390 * scale}px;height:${888 * scale}px">
+      <div class="screen-inner" style="transform:scale(${scale})">
+        <div class="statusbar"><span>9:41</span><span class="icons"><span class="bars"><i style="height:4px"></i><i style="height:6px"></i><i style="height:8px"></i><i style="height:11px"></i></span><span class="battery"></span></span></div>
+        <iframe></iframe>
+      </div>
+    </div>`;
+  document.body.append(el);
+  return el.querySelector('iframe');
+}
+
+function laptop({ x, y, scale = 0.5 }) {
+  const el = document.createElement('div');
+  el.className = 'laptop';
+  el.style.left = `${x}px`;
+  el.style.top = `${y}px`;
+  el.innerHTML = `
+    <div class="lid"><div class="screen" style="width:${1440 * scale}px;height:${900 * scale}px">
+      <div class="screen-inner" style="transform:scale(${scale});width:1440px"><iframe style="width:1440px;height:900px"></iframe></div>
+    </div></div>
+    <div class="base"></div>`;
+  document.body.append(el);
+  return el.querySelector('iframe');
+}
+
+function add(html) { document.body.insertAdjacentHTML('beforeend', html); }
+function head(eyebrow, title, sub = '') {
+  add(`<div class="head">${eyebrow ? `<div class="eyebrow">${eyebrow}</div>` : ''}<h1>${title}</h1>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`);
+}
+function glow(x, y) { add(`<div class="glow" style="left:${x}px;top:${y}px"></div>`); }
+function brandline() { add(`<div class="brandline"><img src="/site/icons/icon.svg" alt="">Paycheck Budget 2027</div>`); }
+
+/**
+ * Loads the real app into a frame with a given budget and look, then runs `act` inside it.
+ * Frames load one at a time because they share the browser's storage.
+ */
+async function load(frame, { state = sampleState(), unlocked = true, palette = 'cobalt', font = 'modern', view = 'home', act } = {}) {
+  localStorage.clear();
+  localStorage.setItem('paycheck-budget-2027', JSON.stringify({ ...state, sample: false }));
+  if (unlocked) localStorage.setItem('paycheck-budget-2027-unlocked', '1');
+  localStorage.setItem('paycheck-budget-2027-theme', 'light');
+  localStorage.setItem('paycheck-budget-2027-palette', palette);
+  localStorage.setItem('paycheck-budget-2027-font', font);
+  await new Promise(resolve => { frame.onload = resolve; frame.src = `/site/index.html?today=${TODAY}#${view}`; });
+  const win = frame.contentWindow, doc = frame.contentDocument;
+  doc.head.insertAdjacentHTML('beforeend', '<style>.toast{display:none!important} html{scrollbar-width:none} ::-webkit-scrollbar{display:none}</style>');
+  await sleep(150);
+  const $ = sel => doc.querySelector(sel);
+  const helpers = {
+    win, doc, $,
+    click: sel => $(sel).click(),
+    type(sel, value) { const el = typeof sel === 'string' ? $(sel) : sel; el.value = value; el.dispatchEvent(new Event('input', { bubbles: true })); },
+    scrollTo(sel, offset = 70) { const el = typeof sel === 'string' ? $(sel) : sel; win.scrollTo(0, el.getBoundingClientRect().top + win.scrollY - offset); },
+  };
+  if (act) await act(helpers);
+  await sleep(250);
+  return helpers;
+}
+
+// ---------- The 12 photos ----------
+const SHOTS = {
+  1: async () => {
+    glow(420, 120);
+    add(`<div class="head" style="right:520px;top:150px">
+      <div class="eyebrow">Paycheck Budget 2027</div>
+      <h1 style="font-size:76px">Budget by paycheck, <em>not by month.</em></h1>
+      <div class="sub" style="margin-top:22px">Know exactly what's left to spend until your next payday.</div>
+      <div class="pills"><span class="pill">Works offline</span><span class="pill">Pay once</span><span class="pill">No account</span></div>
+    </div>`);
+    brandline();
+    await load(phone({ x: 545, y: 70, scale: 0.98 }));
+  },
+
+  2: async () => {
+    glow(120, 280);
+    head('Every paycheck planned', 'See which paycheck <em>pays each bill</em>', 'Each bill comes out of the last paycheck before it\'s due.');
+    const a = phone({ x: 95, y: 330, scale: 0.8 });
+    const b = phone({ x: 515, y: 330, scale: 0.8 });
+    await load(a, { view: 'plan', act: h => h.scrollTo(h.doc.querySelectorAll('.check')[0]) });
+    await load(b, { view: 'plan', act: h => h.scrollTo(h.doc.querySelectorAll('.check')[1]) });
+  },
+
+  3: async () => {
+    glow(380, 260);
+    head('Smooth my paychecks', 'Tight paycheck? <em>Even it out</em> in one tap', 'Pays a few bills a little early, never late.');
+    let before = '', after = '';
+    await load(phone({ x: 520, y: 300, scale: 0.86 }), {
+      unlocked: false, view: 'plan',
+      async act(h) {
+        h.click('[data-action=smooth]');
+        await sleep(100);
+        const bolds = [...h.doc.querySelectorAll('#smoothCard p b')].map(b => b.textContent);
+        [before, after] = bolds;
+        h.scrollTo('#smoothCard');
+      },
+    });
+    add(`<div class="callout" style="left:70px;top:430px;width:400px">
+      <div class="label">Your tightest paycheck</div>
+      <div class="row"><span class="big from">${before.replace(/\.\d\d$/, '')}</span><span class="arrow">→</span><span class="big to">${after.replace(/\.\d\d$/, '')}</span></div>
+      <div class="label" style="margin-top:6px">to spend, after smoothing</div>
+    </div>`);
+    brandline();
+  },
+
+  4: async () => {
+    glow(300, 260);
+    head('Can I afford this?', 'Ask <em>before</em> you buy', 'Type a price. Get a plain yes or no, based on what\'s left until payday.');
+    await load(phone({ x: 300, y: 300, scale: 0.9 }), {
+      act(h) {
+        const f = h.$('[data-form=afford]');
+        f.price.value = '400';
+        f.requestSubmit();
+      },
+    });
+  },
+
+  5: async () => {
+    glow(120, 280);
+    head('No more surprise bills', 'Yearly bills, saved <em>a little each payday</em>', 'Car registration, memberships and holiday gifts are split across your paychecks.');
+    const a = phone({ x: 95, y: 330, scale: 0.8 });
+    const b = phone({ x: 515, y: 330, scale: 0.8 });
+    await load(a, { act: h => h.scrollTo([...h.doc.querySelectorAll('#view-home .card h2')].find(x => x.textContent.startsWith('Paycheck on')).closest('.card')) });
+    await load(b, {
+      view: 'plan',
+      async act(h) {
+        h.click('#monthTabs [data-month="2"]');
+        await sleep(100);
+        h.scrollTo([...h.doc.querySelectorAll('.check')].find(c => c.textContent.includes('paid from savings')));
+      },
+    });
+  },
+
+  6: async () => {
+    glow(300, 260);
+    head('Bonus paychecks', '2027 has <em>2 bonus paychecks.</em> Plan them now.', 'If you\'re paid every 2 weeks, two months have an extra payday.');
+    const state = { ...sampleState(), bonus: { '2027-04-30': 'savings', '2027-10-29': 'holidays' } };
+    await load(phone({ x: 300, y: 300, scale: 0.9 }), {
+      state,
+      act: h => h.scrollTo([...h.doc.querySelectorAll('#view-home .card h2')].find(x => x.textContent.includes('bonus paycheck')).closest('.card')),
+    });
+  },
+
+  7: async () => {
+    glow(120, 280);
+    head('Your year at a glance', 'Your whole year, <em>one paycheck at a time</em>', 'See every paycheck, spot the tight ones, and track your savings goals.');
+    const a = phone({ x: 95, y: 330, scale: 0.8 });
+    const b = phone({ x: 515, y: 330, scale: 0.8 });
+    await load(a, { view: 'plan', act: h => h.scrollTo('#yearChart') });
+    await load(b, { act: h => h.scrollTo([...h.doc.querySelectorAll('#view-home .card h2')].find(x => x.textContent === 'Savings goals').closest('.card')) });
+  },
+
+  8: async () => {
+    glow(200, 300);
+    head('Easy setup', 'Set up in <em>5 quick questions</em>', 'No forms, no spreadsheets. Just tap and type.');
+    const s = 0.66;
+    const a = phone({ x: 52, y: 320, scale: s });
+    const b = phone({ x: 365, y: 320, scale: s });
+    const c = phone({ x: 678, y: 320, scale: s });
+    await load(a, { state: blankState(), view: 'setup', act: h => h.click('[data-action=wizard]') });
+    await load(b, {
+      state: blankState(), view: 'setup',
+      async act(h) {
+        h.click('[data-action=wizard]');
+        h.click('[data-action=wiz-freq][data-value=biweekly]');
+        h.type('[data-wiz-pay=amount]', '2450');
+        h.click('#wizNext');
+        for (const [name, amount, day] of [['Rent or mortgage', 1450, 1], ['Car payment', 365, 18], ['Phone', 78, 22]]) {
+          h.click(`[data-action=wiz-add][data-name="${name}"]`);
+          const rows = h.doc.querySelectorAll('.wiz-row');
+          const row = rows[rows.length - 1];
+          h.type(row.querySelector('[data-field=amount]'), String(amount));
+          h.type(row.querySelector('[data-field=day]'), String(day));
+        }
+        h.doc.activeElement?.blur();
+        h.$('#wizBody').scrollTop = 0;
+      },
+    });
+    await load(c, {
+      view: 'setup',
+      async act(h) {
+        h.click('[data-action=wizard]');
+        h.click('[data-action=wiz-freq][data-value=biweekly]');
+        for (let i = 0; i < 4; i++) { h.click('#wizNext'); await sleep(30); }
+        h.doc.activeElement?.blur();
+      },
+    });
+    add(`<div class="tag" style="left:52px;width:277px;top:930px">1. How you're paid</div>
+         <div class="tag" style="left:365px;width:277px;top:930px">2. Tap to add bills</div>
+         <div class="tag" style="left:678px;width:277px;top:930px">3. You're all set</div>`);
+  },
+
+  9: async () => {
+    glow(200, 300);
+    head('Make it yours', '<em>7 colours,</em> 4 fonts, your name on it', 'Light or dark mode too. Change it any time in the Me tab.');
+    const s = 0.55, y = 330;
+    const looks = [
+      { palette: 'blush', font: 'elegant', owner: { name: 'Jordan', appName: "Jordan's Paycheck Plan" } },
+      { palette: 'cobalt', font: 'modern' },
+      { palette: 'sage', font: 'rounded' },
+      { palette: 'lavender', font: 'ledger' },
+    ];
+    const frames = looks.map((l, i) => phone({ x: 40 + i * 236, y: y + (i % 2) * 40, scale: s, palette: l.palette }));
+    for (let i = 0; i < looks.length; i++) {
+      const { palette, font, owner } = looks[i];
+      await load(frames[i], { palette, font, state: { ...sampleState(), ...(owner ? { owner } : {}) } });
+    }
+  },
+
+  10: async () => {
+    glow(250, 300);
+    head('Works everywhere', 'On your <em>phone, tablet and computer</em>', 'Add it to your home screen. It works offline once it\'s open.');
+    const lap = laptop({ x: 80, y: 330, scale: 0.5 });
+    const ph = phone({ x: 700, y: 430, scale: 0.6 });
+    await load(lap, { view: 'plan' });
+    await load(ph);
+  },
+
+  11: async () => {
+    glow(450, 260);
+    head('Private by design', 'No account. No subscription. <em>Your data stays yours.</em>');
+    const icon = d => `<svg viewBox="0 0 24 24">${d}</svg>`;
+    add(`<div class="points" style="left:70px;top:350px;width:470px">
+      <div class="point"><div class="ic">${icon('<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>')}</div><div><b>Stays on your device</b><span>No sign-up, no tracking, no ads.</span></div></div>
+      <div class="point"><div class="ic">${icon('<circle cx="12" cy="12" r="8"/><path d="M9 12l2 2 4-4"/>')}</div><div><b>Pay once</b><span>No monthly fees. Free updates.</span></div></div>
+      <div class="point"><div class="ic">${icon('<path d="M5 12.5a10 10 0 0 1 14 0M8 15.5a6 6 0 0 1 8 0"/><circle cx="12" cy="18.5" r="1"/><path d="M4 4l16 16"/>')}</div><div><b>Works offline</b><span>Open it anywhere, even without Wi-Fi.</span></div></div>
+      <div class="point"><div class="ic">${icon('<path d="M12 4v10M8 10l4 4 4-4M5 20h14"/>')}</div><div><b>Back up any time</b><span>Save a copy, move it to a new phone.</span></div></div>
+    </div>`);
+    await load(phone({ x: 585, y: 300, scale: 0.8 }), {
+      view: 'more',
+      act: h => h.scrollTo([...h.doc.querySelectorAll('#view-more .card h2')].find(x => x.textContent === 'Your data').closest('.card'), 80),
+    });
+  },
+
+  12: async () => {
+    glow(450, 260);
+    head('How it works', 'Try it free, then <em>unlock all of 2027</em>');
+    add(`<div class="points" style="left:70px;top:330px;width:470px">
+      <div class="point"><div class="ic">1</div><div><b>Try it free</b><span>Plan January and February 2027 in full, no sign-up.</span></div></div>
+      <div class="point"><div class="ic">2</div><div><b>Buy and download</b><span>Your Start Here PDF has your app link and unlock code.</span></div></div>
+      <div class="point"><div class="ic">3</div><div><b>Add it to your home screen</b><span>It opens like a regular app, even offline.</span></div></div>
+      <div class="point"><div class="ic">4</div><div><b>Unlock all 26 paychecks</b><span>Tap the link in your PDF, or type the code.</span></div></div>
+    </div>`);
+    await load(phone({ x: 585, y: 300, scale: 0.8 }), { unlocked: false, view: 'plan', async act(h) { h.click('#monthTabs [data-month="all"]'); await sleep(100); h.scrollTo(h.doc.querySelector('.check.locked'), 160); } });
+  },
+};
+
+const shot = Number(new URLSearchParams(location.search).get('shot') || 1);
+await SHOTS[shot]();
+await document.fonts.ready;
+await sleep(300);
+window.__ready = true;
+</script>
+</body>
+</html>

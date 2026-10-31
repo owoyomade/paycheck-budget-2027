@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <script>
+    // Apply the saved Light/Dark choice before the page draws, so it doesn't flash.
+    try {
+      const d = document.documentElement.dataset;
+      d.theme = localStorage.getItem('paycheck-budget-2027-theme') || 'light';
+      d.palette = localStorage.getItem('paycheck-budget-2027-palette') || 'cobalt';
+      d.font = localStorage.getItem('paycheck-budget-2027-font') || 'modern';
+    } catch (e) {}
+  </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>2027 Paycheck Budget</title>
+  <meta name="description" content="Plan 2027 one paycheck at a time. Works offline, no account, your data stays on your device.">
+  <meta name="theme-color" content="#f4f5f7">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Paycheck 2027">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="appbar">
+    <div class="brand">
+      <img src="icons/icon.svg" alt="" width="30" height="30">
+      <span id="brandName">Paycheck Budget <b>2027</b></span>
+    </div>
+    <button id="trialPill" class="pill" data-action="go" data-view="more"></button>
+  </header>
+
+  <div id="sampleBanner" class="banner" hidden>
+    <span>You're looking at a <b>sample household</b>. Explore it, then start your own in 5 quick questions.</span>
+    <button data-action="clear-sample">Start mine</button>
+  </div>
+
+  <main>
+    <section id="view-home" class="view" aria-label="Home"></section>
+
+    <section id="view-plan" class="view" aria-label="Plan">
+      <div class="print-title" id="printTitle">My 2027 paycheck plan</div>
+      <div id="summary" class="summary"></div>
+      <div id="yearChart" class="card chart-card"></div>
+      <div id="smoothCard" class="card"></div>
+      <div id="beforeFirst"></div>
+      <div class="toolbar">
+        <div id="monthTabs" class="chips" role="tablist" aria-label="Month"></div>
+        <div class="toolbar-right">
+          <label class="toggle"><input id="hidePaid" type="checkbox"> Hide paid bills</label>
+          <button class="ghost small" data-action="print">Print</button>
+        </div>
+      </div>
+      <div id="timeline" class="timeline"></div>
+    </section>
+
+    <section id="view-setup" class="view" aria-label="Setup">
+      <div class="card guided">
+        <div>
+          <h2>Prefer to answer a few questions?</h2>
+          <p class="hint">Five quick steps: your pay, your bills and what you set aside.</p>
+        </div>
+        <button data-action="wizard">Set up step by step</button>
+      </div>
+
+      <div class="card">
+        <h2>Your pay</h2>
+        <label>How often you're paid
+          <select data-pay-field="frequency">
+            <option value="weekly">Weekly</option>
+            <option value="biweekly">Every 2 weeks</option>
+            <option value="semimonthly">Twice a month</option>
+            <option value="monthly">Monthly</option>
+          </select>
+        </label>
+        <label data-show="weekly biweekly">Your first payday in 2027
+          <input data-pay-field="firstDate" type="date" min="2026-01-01" max="2027-12-31">
+        </label>
+        <div class="row" data-show="semimonthly">
+          <label>First payday (day of month)<input data-pay-field="semi1" type="number" inputmode="numeric" min="1" max="31"></label>
+          <label>Second payday<input data-pay-field="semi2" type="number" inputmode="numeric" min="1" max="31"></label>
+        </div>
+        <label data-show="monthly">Payday (day of month)<input data-pay-field="monthlyDay" type="number" inputmode="numeric" min="1" max="31"></label>
+        <label data-show="semimonthly monthly">When payday lands on a weekend
+          <select data-pay-field="weekendRule">
+            <option value="before">I'm paid the Friday before</option>
+            <option value="after">I'm paid the Monday after</option>
+            <option value="none">I'm paid that day</option>
+          </select>
+        </label>
+        <div class="row">
+          <label>Take-home pay per paycheck
+            <input data-pay-field="amount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="e.g. 2400">
+          </label>
+          <label>Currency
+            <select id="currency">
+              <option value="USD">US dollar ($)</option>
+              <option value="CAD">Canadian dollar ($)</option>
+              <option value="GBP">British pound (£)</option>
+              <option value="EUR">Euro (€)</option>
+              <option value="AUD">Australian dollar ($)</option>
+              <option value="NZD">New Zealand dollar ($)</option>
+            </select>
+          </label>
+        </div>
+        <p class="hint">Use the amount that lands in your bank. You can change any single paycheck on the Plan tab.</p>
+        <label>Money in the bank before your first 2027 payday (optional)
+          <input id="cushionStart" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0">
+        </label>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><h2>Bills</h2><button class="small" data-action="add-bill">+ Add bill</button></div>
+        <p class="hint">Each bill is paid from the last paycheck before it's due. Yearly bills are saved for a little each payday.</p>
+        <div id="billList" class="item-list"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><h2>Set-asides</h2><button class="small" data-action="add-allot">+ Add</button></div>
+        <p class="hint">Money you take out of every paycheck, like groceries or savings. Add a goal to track your progress.</p>
+        <div id="allotList" class="item-list"></div>
+      </div>
+    </section>
+
+    <section id="view-me" class="view" aria-label="Me">
+      <div class="card">
+        <h2>Make it yours</h2>
+        <label>Your first name
+          <input id="ownerName" maxlength="30" autocomplete="given-name" placeholder="e.g. Jordan">
+        </label>
+        <label>App name
+          <input id="appName" maxlength="40" placeholder="Paycheck Budget 2027">
+        </label>
+        <div id="nameIdeas" class="quick"></div>
+        <p class="hint">Shown at the top of the app and on your printed plan. Leave it empty to keep the usual name.</p>
+      </div>
+
+      <div class="card">
+        <h2>Colour</h2>
+        <div id="paletteList" class="swatches" role="radiogroup" aria-label="Colour"></div>
+      </div>
+
+      <div class="card">
+        <h2>Font</h2>
+        <div id="fontList" class="font-options" role="radiogroup" aria-label="Font"></div>
+      </div>
+
+      <div class="card">
+        <h2>Light or dark</h2>
+        <div class="segmented" role="group" aria-label="Light or dark">
+          <button data-action="theme" data-theme-choice="light">Light</button>
+          <button data-action="theme" data-theme-choice="dark">Dark</button>
+          <button data-action="theme" data-theme-choice="auto">Match my device</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-more" class="view" aria-label="More">
+      <div id="unlockCard" class="card"></div>
+
+      <div class="card">
+        <h2>Your data</h2>
+        <p class="hint">Everything stays in this browser on this device. Save a backup to move it to another device or keep it safe.</p>
+        <div class="button-grid">
+          <button class="ghost" data-action="backup">Save a backup</button>
+          <label class="ghost button-like">Restore a backup<input id="restoreFile" type="file" accept="application/json,.json" hidden></label>
+          <button class="ghost" data-action="export-csv">Export to spreadsheet (CSV)</button>
+          <button class="ghost" data-action="print">Print my plan</button>
+          <button class="ghost" data-action="load-sample">Show the sample household</button>
+          <button class="ghost danger" data-action="reset-all">Erase everything</button>
+        </div>
+      </div>
+
+      <div class="card prose">
+        <h2>Help and info</h2>
+        <p>Questions or problems? Email <a id="supportLink" href="#"></a> and we'll help.</p>
+        <p><b>A planning tool, not financial advice.</b> This app helps you plan your own money. It isn't financial, tax or legal advice. Check amounts against your bank and your bills.</p>
+        <p><a href="privacy.html">Privacy: your data never leaves your device</a></p>
+        <p class="hint" id="versionLine"></p>
+      </div>
+    </section>
+  </main>
+
+  <nav class="tabbar" aria-label="Main">
+    <button data-action="go" data-view="home">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z"/></svg>
+      <span>Home</span>
+    </button>
+    <button data-action="go" data-view="plan">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>
+      <span>Plan</span>
+    </button>
+    <button data-action="go" data-view="setup">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h9"/></svg>
+      <span>Setup</span>
+    </button>
+    <button data-action="go" data-view="me">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c1.2-3.6 4-5.5 7-5.5s5.8 1.9 7 5.5"/></svg>
+      <span>Me</span>
+    </button>
+    <button data-action="go" data-view="more">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="18" cy="12" r="1.3"/></svg>
+      <span>More</span>
+    </button>
+  </nav>
+
+  <dialog id="wizard" class="wizard" aria-labelledby="wizTitle">
+    <div class="wiz-top">
+      <span id="wizStep" class="wiz-step"></span>
+      <button class="icon" data-action="wiz-close" aria-label="Close">×</button>
+    </div>
+    <div class="wiz-progress" aria-hidden="true"><span id="wizBar"></span></div>
+    <div id="wizBody" class="wiz-body"></div>
+    <div class="wiz-foot">
+      <button class="ghost" data-action="wiz-back" id="wizBack">Back</button>
+      <button data-action="wiz-next" id="wizNext">Next</button>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "paycheck-budget-2027",
+  "private": true,
+  "version": "1.0.0",
+  "description": "2027 Paycheck Budget: plan each paycheck, not each month. An installable, offline web app by AppNookStudio.",
+  "type": "module",
+  "scripts": {
+    "start": "python3 -m http.server 5173 --directory site",
+    "test": "node --test",
+    "icons": "node scripts/make-icons.mjs",
+    "unlock-code": "node scripts/new-unlock-code.mjs",
+    "photos": "node sell/make_listing_photos.mjs"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^24.43.1"
+  }
+}
